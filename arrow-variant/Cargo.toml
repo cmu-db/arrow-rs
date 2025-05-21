@@ -49,4 +49,8 @@ serde_json = { version = "1.0", default-features = false, features = ["std"] }
 indexmap = "2.0.0"
 
 [dev-dependencies]
-arrow-cast = { workspace = true } 
+arrow-cast = { workspace = true }
+
+[[example]]
+name = "json_to_variant"
+path = "examples/json_to_variant.rs" 

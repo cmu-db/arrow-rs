@@ -20,6 +20,12 @@
 use arrow_schema::ArrowError;
 use std::io::Write;
 
+/// Module for JSON to Variant conversion
+pub mod json;
+
+// Re-export main JSON functionality
+pub use json::{json_to_variant, JsonParser};
+
 /// Maximum value that can be stored in a single byte (2^8 - 1)
 pub const MAX_1BYTE_VALUE: usize = 255;
 

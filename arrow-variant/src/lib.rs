@@ -91,6 +91,33 @@
 //! # Ok(())
 //! # }
 //! ```
+//!
+//! # Converting JSON to Variant
+//!
+//! You can convert JSON data to Variant format:
+//!
+//! ```
+//! # use arrow_variant::encoder::{json_to_variant};
+//! # use arrow_variant::Variant;
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let json = r#"{"name": "Bob", "age": 25, "is_active": true}"#;
+//!
+//! let mut metadata_buffer = vec![];
+//! let mut value_buffer = vec![];
+//!
+//! // Convert JSON to Variant format
+//! json_to_variant(json.as_bytes(), &mut metadata_buffer, &mut value_buffer)?;
+//!
+//! // Parse the variant
+//! let variant = Variant::new(&metadata_buffer, &value_buffer);
+//!
+//! // Access values
+//! assert_eq!(variant.get("name")?.unwrap().as_string()?, "Bob");
+//! assert_eq!(variant.get("age")?.unwrap().as_i64()?, 25);
+//! assert_eq!(variant.get("is_active")?.unwrap().as_bool()?, true);
+//! # Ok(())
+//! # }
+//! ```
 
 /// The `builder` module provides tools for creating variant values.
 pub mod builder;
@@ -106,5 +133,5 @@ pub mod variant;
 
 // Re-export primary types
 pub use crate::builder::{PrimitiveValue, VariantBuilder};
-pub use crate::encoder::{VariantBasicType, VariantPrimitiveType};
+pub use crate::encoder::{VariantBasicType, VariantPrimitiveType, json_to_variant, JsonParser};
 pub use crate::variant::Variant;
