@@ -16,6 +16,7 @@
 // under the License.
 
 use arrow::array::ArrayRef;
+use arrow::compute::CastOptions;
 use arrow::datatypes;
 use arrow::datatypes::ArrowPrimitiveType;
 use arrow::error::{ArrowError, Result};
@@ -29,17 +30,62 @@ pub(crate) fn make_shredding_row_builder<'a>(
     //metadata: &BinaryViewArray,
     path: VariantPath<'a>,
     data_type: Option<&'a datatypes::DataType>,
+    cast_options: &'a CastOptions,
 ) -> Result<Box<dyn VariantShreddingRowBuilder + 'a>> {
     use arrow::array::PrimitiveBuilder;
-    use datatypes::Int32Type;
-    
+    use datatypes::{
+        Float16Type, Float32Type, Float64Type, Int16Type, Int32Type, Int64Type, Int8Type,
+    };
+
     // support non-empty paths (field access) and some empty path cases
     if path.is_empty() {
         return match data_type {
+            Some(datatypes::DataType::Int8) => {
+                let builder = PrimitiveVariantShreddingRowBuilder {
+                    builder: PrimitiveBuilder::<Int8Type>::new(),
+                    cast_options,
+                };
+                Ok(Box::new(builder))
+            }
+            Some(datatypes::DataType::Int16) => {
+                let builder = PrimitiveVariantShreddingRowBuilder {
+                    builder: PrimitiveBuilder::<Int16Type>::new(),
+                    cast_options,
+                };
+                Ok(Box::new(builder))
+            }
             Some(datatypes::DataType::Int32) => {
-                // Return PrimitiveInt32Builder for type conversion
                 let builder = PrimitiveVariantShreddingRowBuilder {
                     builder: PrimitiveBuilder::<Int32Type>::new(),
+                    cast_options,
+                };
+                Ok(Box::new(builder))
+            }
+            Some(datatypes::DataType::Int64) => {
+                let builder = PrimitiveVariantShreddingRowBuilder {
+                    builder: PrimitiveBuilder::<Int64Type>::new(),
+                    cast_options,
+                };
+                Ok(Box::new(builder))
+            }
+            Some(datatypes::DataType::Float16) => {
+                let builder = PrimitiveVariantShreddingRowBuilder {
+                    builder: PrimitiveBuilder::<Float16Type>::new(),
+                    cast_options,
+                };
+                Ok(Box::new(builder))
+            }
+            Some(datatypes::DataType::Float32) => {
+                let builder = PrimitiveVariantShreddingRowBuilder {
+                    builder: PrimitiveBuilder::<Float32Type>::new(),
+                    cast_options,
+                };
+                Ok(Box::new(builder))
+            }
+            Some(datatypes::DataType::Float64) => {
+                let builder = PrimitiveVariantShreddingRowBuilder {
+                    builder: PrimitiveBuilder::<Float64Type>::new(),
+                    cast_options,
                 };
                 Ok(Box::new(builder))
             }
@@ -48,13 +94,10 @@ pub(crate) fn make_shredding_row_builder<'a>(
                 let builder = VariantArrayShreddingRowBuilder::new(16);
                 Ok(Box::new(builder))
             }
-            _ => {
-                // only Int32 supported for empty paths
-                Err(ArrowError::NotYetImplemented(format!(
-                    "variant_get with empty path and data_type={:?} not yet implemented",
-                    data_type
-                )))
-            }
+            _ => Err(ArrowError::NotYetImplemented(format!(
+                "variant_get with empty path and data_type={:?} not yet implemented",
+                data_type
+            ))),
         };
     }
 
@@ -70,10 +113,52 @@ pub(crate) fn make_shredding_row_builder<'a>(
     }
 
     match data_type {
+        Some(datatypes::DataType::Int8) => {
+            let inner_builder = PrimitiveVariantShreddingRowBuilder {
+                builder: PrimitiveBuilder::<Int8Type>::new(),
+                cast_options,
+            };
+            wrap_with_path!(inner_builder)
+        }
+        Some(datatypes::DataType::Int16) => {
+            let inner_builder = PrimitiveVariantShreddingRowBuilder {
+                builder: PrimitiveBuilder::<Int16Type>::new(),
+                cast_options,
+            };
+            wrap_with_path!(inner_builder)
+        }
         Some(datatypes::DataType::Int32) => {
-            // Create a primitive builder and wrap it with path functionality
             let inner_builder = PrimitiveVariantShreddingRowBuilder {
                 builder: PrimitiveBuilder::<Int32Type>::new(),
+                cast_options,
+            };
+            wrap_with_path!(inner_builder)
+        }
+        Some(datatypes::DataType::Int64) => {
+            let inner_builder = PrimitiveVariantShreddingRowBuilder {
+                builder: PrimitiveBuilder::<Int64Type>::new(),
+                cast_options,
+            };
+            wrap_with_path!(inner_builder)
+        }
+        Some(datatypes::DataType::Float16) => {
+            let inner_builder = PrimitiveVariantShreddingRowBuilder {
+                builder: PrimitiveBuilder::<Float16Type>::new(),
+                cast_options,
+            };
+            wrap_with_path!(inner_builder)
+        }
+        Some(datatypes::DataType::Float32) => {
+            let inner_builder = PrimitiveVariantShreddingRowBuilder {
+                builder: PrimitiveBuilder::<Float32Type>::new(),
+                cast_options,
+            };
+            wrap_with_path!(inner_builder)
+        }
+        Some(datatypes::DataType::Float64) => {
+            let inner_builder = PrimitiveVariantShreddingRowBuilder {
+                builder: PrimitiveBuilder::<Float64Type>::new(),
+                cast_options,
             };
             wrap_with_path!(inner_builder)
         }
@@ -82,13 +167,10 @@ pub(crate) fn make_shredding_row_builder<'a>(
             let inner_builder = VariantArrayShreddingRowBuilder::new(16);
             wrap_with_path!(inner_builder)
         }
-        _ => {
-            // only Int32 and VariantArray supported
-            Err(ArrowError::NotYetImplemented(format!(
-                "variant_get with path={:?} and data_type={:?} not yet implemented",
-                path, data_type
-            )))
-        }
+        _ => Err(ArrowError::NotYetImplemented(format!(
+            "variant_get with path={:?} and data_type={:?} not yet implemented",
+            path, data_type
+        ))),
     }
 }
 
@@ -133,9 +215,35 @@ impl<T: VariantShreddingRowBuilder> VariantShreddingRowBuilder for VariantPathRo
 trait VariantAsPrimitive<T: ArrowPrimitiveType> {
     fn as_primitive(&self) -> Option<T::Native>;
 }
+
 impl VariantAsPrimitive<datatypes::Int32Type> for Variant<'_, '_> {
     fn as_primitive(&self) -> Option<i32> {
         self.as_int32()
+    }
+}
+impl VariantAsPrimitive<datatypes::Int16Type> for Variant<'_, '_> {
+    fn as_primitive(&self) -> Option<i16> {
+        self.as_int16()
+    }
+}
+impl VariantAsPrimitive<datatypes::Int8Type> for Variant<'_, '_> {
+    fn as_primitive(&self) -> Option<i8> {
+        self.as_int8()
+    }
+}
+impl VariantAsPrimitive<datatypes::Int64Type> for Variant<'_, '_> {
+    fn as_primitive(&self) -> Option<i64> {
+        self.as_int64()
+    }
+}
+impl VariantAsPrimitive<datatypes::Float16Type> for Variant<'_, '_> {
+    fn as_primitive(&self) -> Option<half::f16> {
+        self.as_f16()
+    }
+}
+impl VariantAsPrimitive<datatypes::Float32Type> for Variant<'_, '_> {
+    fn as_primitive(&self) -> Option<f32> {
+        self.as_f32()
     }
 }
 impl VariantAsPrimitive<datatypes::Float64Type> for Variant<'_, '_> {
@@ -144,12 +252,31 @@ impl VariantAsPrimitive<datatypes::Float64Type> for Variant<'_, '_> {
     }
 }
 
-/// Builder for shredding variant values to primitive values
-struct PrimitiveVariantShreddingRowBuilder<T: ArrowPrimitiveType> {
-    builder: arrow::array::PrimitiveBuilder<T>,
+/// Helper function to get a user-friendly type name
+fn get_type_name<T: ArrowPrimitiveType>() -> &'static str {
+    match std::any::type_name::<T>() {
+        "arrow_array::types::Int32Type" => "Int32",
+        "arrow_array::types::Int16Type" => "Int16",
+        "arrow_array::types::Int8Type" => "Int8",
+        "arrow_array::types::Int64Type" => "Int64",
+        "arrow_array::types::UInt32Type" => "UInt32",
+        "arrow_array::types::UInt16Type" => "UInt16",
+        "arrow_array::types::UInt8Type" => "UInt8",
+        "arrow_array::types::UInt64Type" => "UInt64",
+        "arrow_array::types::Float32Type" => "Float32",
+        "arrow_array::types::Float64Type" => "Float64",
+        "arrow_array::types::Float16Type" => "Float16",
+        _ => "Unknown",
+    }
 }
 
-impl<T> VariantShreddingRowBuilder for PrimitiveVariantShreddingRowBuilder<T>
+/// Builder for shredding variant values to primitive values
+struct PrimitiveVariantShreddingRowBuilder<'a, T: ArrowPrimitiveType> {
+    builder: arrow::array::PrimitiveBuilder<T>,
+    cast_options: &'a CastOptions<'a>,
+}
+
+impl<'a, T> VariantShreddingRowBuilder for PrimitiveVariantShreddingRowBuilder<'a, T>
 where
     T: ArrowPrimitiveType,
     for<'m, 'v> Variant<'m, 'v>: VariantAsPrimitive<T>,
@@ -164,9 +291,15 @@ where
             self.builder.append_value(v);
             Ok(true)
         } else {
-            // append null on conversion failure (safe casting behavior)
-            // This matches the default CastOptions::safe = true behavior
-            // TODO: In future steps, respect CastOptions for safe vs unsafe casting
+            if !self.cast_options.safe {
+                // Unsafe casting: return error on conversion failure
+                return Err(ArrowError::CastError(format!(
+                    "Failed to extract primitive of type {} from variant {:?} at path VariantPath([])",
+                    get_type_name::<T>(),
+                    value
+                )));
+            }
+            // Safe casting: append null on conversion failure
             self.builder.append_null();
             Ok(false)
         }
@@ -207,5 +340,3 @@ impl VariantShreddingRowBuilder for VariantArrayShreddingRowBuilder {
         Ok(Arc::new(builder.build()))
     }
 }
-
-

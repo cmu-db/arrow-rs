@@ -19,11 +19,16 @@
 
 use arrow::array::{Array, ArrayData, ArrayRef, AsArray, BinaryViewArray, StructArray};
 use arrow::buffer::NullBuffer;
-use arrow::datatypes::Int32Type;
+use arrow::datatypes::{
+    Float16Type, Float32Type, Float64Type, Int16Type, Int32Type, Int64Type, Int8Type, UInt16Type,
+    UInt32Type, UInt64Type, UInt8Type,
+};
 use arrow_schema::{ArrowError, DataType, Field, FieldRef, Fields};
 use parquet_variant::Variant;
 use std::any::Any;
 use std::sync::Arc;
+
+use crate::type_conversion::primitive_conversion_single_value;
 
 /// An array of Parquet [`Variant`] values
 ///
@@ -128,7 +133,6 @@ impl VariantArray {
         })
     }
 
-    #[allow(unused)]
     pub(crate) fn from_parts(
         metadata: BinaryViewArray,
         value: Option<BinaryViewArray>,
@@ -150,7 +154,8 @@ impl VariantArray {
         // This would be a lot simpler if ShreddingState were just a pair of Option... we already
         // have everything we need.
         let inner = builder.build();
-        let shredding_state = ShreddingState::try_new(metadata.clone(), value, typed_value).unwrap(); // valid by construction
+        let shredding_state =
+            ShreddingState::try_new(metadata.clone(), value, typed_value).unwrap(); // valid by construction
         Self {
             inner,
             metadata,
@@ -207,7 +212,9 @@ impl VariantArray {
                     typed_value_to_variant(typed_value, index)
                 }
             }
-            ShreddingState::PartiallyShredded { value, typed_value, .. } => {
+            ShreddingState::PartiallyShredded {
+                value, typed_value, ..
+            } => {
                 // PartiallyShredded case (formerly ImperfectlyShredded)
                 if typed_value.is_null(index) {
                     Variant::new(self.metadata.value(index), value.value(index))
@@ -313,9 +320,11 @@ impl ShreddedVariantFieldArray {
         };
 
         // Extract value and typed_value fields (metadata is not expected in ShreddedVariantFieldArray)
-        let value = inner_struct.column_by_name("value").and_then(|col| col.as_binary_view_opt().cloned());
+        let value = inner_struct
+            .column_by_name("value")
+            .and_then(|col| col.as_binary_view_opt().cloned());
         let typed_value = inner_struct.column_by_name("typed_value").cloned();
-        
+
         // Use a dummy metadata for the constructor (ShreddedVariantFieldArray doesn't have metadata)
         let dummy_metadata = arrow::array::BinaryViewArray::new_null(inner_struct.len());
 
@@ -387,8 +396,8 @@ impl Array for ShreddedVariantFieldArray {
     }
 
     fn nulls(&self) -> Option<&NullBuffer> {
-        // According to the shredding spec, ShreddedVariantFieldArray should be 
-        // physically non-nullable - SQL NULL is inferred by both value and 
+        // According to the shredding spec, ShreddedVariantFieldArray should be
+        // physically non-nullable - SQL NULL is inferred by both value and
         // typed_value being physically NULL
         None
     }
@@ -423,13 +432,13 @@ impl Array for ShreddedVariantFieldArray {
 #[derive(Debug)]
 pub enum ShreddingState {
     /// This variant has no typed_value field
-    Unshredded { 
+    Unshredded {
         metadata: BinaryViewArray,
         value: BinaryViewArray,
     },
     /// This variant has a typed_value field and no value field
     /// meaning it is the shredded type
-    Typed { 
+    Typed {
         metadata: BinaryViewArray,
         typed_value: ArrayRef,
     },
@@ -454,9 +463,7 @@ pub enum ShreddingState {
     /// Note: By strict spec interpretation, this should only be valid for shredded object fields,
     /// not top-level variants. However, we allow it and treat as Variant::Null for pragmatic
     /// handling of missing data.
-    AllNull { 
-        metadata: BinaryViewArray,
-    },
+    AllNull { metadata: BinaryViewArray },
 }
 
 impl ShreddingState {
@@ -583,9 +590,38 @@ impl StructArrayBuilder {
 /// returns the non-null element at index as a Variant
 fn typed_value_to_variant(typed_value: &ArrayRef, index: usize) -> Variant<'_, '_> {
     match typed_value.data_type() {
+        DataType::Int8 => {
+            primitive_conversion_single_value!(Int8Type, typed_value, index)
+        }
+        DataType::Int16 => {
+            primitive_conversion_single_value!(Int16Type, typed_value, index)
+        }
         DataType::Int32 => {
-            let typed_value = typed_value.as_primitive::<Int32Type>();
-            Variant::from(typed_value.value(index))
+            primitive_conversion_single_value!(Int32Type, typed_value, index)
+        }
+        DataType::Int64 => {
+            primitive_conversion_single_value!(Int64Type, typed_value, index)
+        }
+        DataType::UInt8 => {
+            primitive_conversion_single_value!(UInt8Type, typed_value, index)
+        }
+        DataType::UInt16 => {
+            primitive_conversion_single_value!(UInt16Type, typed_value, index)
+        }
+        DataType::UInt32 => {
+            primitive_conversion_single_value!(UInt32Type, typed_value, index)
+        }
+        DataType::UInt64 => {
+            primitive_conversion_single_value!(UInt64Type, typed_value, index)
+        }
+        DataType::Float16 => {
+            primitive_conversion_single_value!(Float16Type, typed_value, index)
+        }
+        DataType::Float32 => {
+            primitive_conversion_single_value!(Float32Type, typed_value, index)
+        }
+        DataType::Float64 => {
+            primitive_conversion_single_value!(Float64Type, typed_value, index)
         }
         // todo other types here (note this is very similar to cast_to_variant.rs)
         // so it would be great to figure out how to share this code
